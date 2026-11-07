@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="robots" content="noindex">
+<title>Elden Tracker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+<style>
+  /* Couleurs système façon iOS : fond groupé, cellules, étiquettes à trois niveaux. */
+  :root {
+    color-scheme: dark;
+    --bg: #000;
+    --cell: #1c1c1e;
+    --cell-2: #2c2c2e;
+    --fill: rgba(118, 118, 128, .24);
+    --sep: rgba(84, 84, 88, .65);
+    --label: #fff;
+    --label-2: rgba(235, 235, 245, .6);
+    --label-3: rgba(235, 235, 245, .3);
+    --tint: #d9b45f;
+    --green: #30d158;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --bar: rgba(22, 22, 24, .72);
+    --shadow: 0 8px 32px rgba(0, 0, 0, .5);
+    --r: 12px;
+    --tabbar: calc(50px + env(safe-area-inset-bottom));
+    --sheet: #1c1c1e;
+    --sheet-cell: #2c2c2e;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      color-scheme: light;
+      --bg: #f2f2f7;
+      --cell: #fff;
+      --cell-2: #e5e5ea;
+      --fill: rgba(118, 118, 128, .12);
+      --sep: rgba(60, 60, 67, .29);
+      --label: #000;
+      --label-2: rgba(60, 60, 67, .6);
+      --label-3: rgba(60, 60, 67, .3);
+      --tint: #a47a1c;
+      --green: #34c759;
+      --red: #ff3b30;
+      --orange: #ff9500;
+      --bar: rgba(249, 249, 249, .8);
+      --shadow: 0 8px 32px rgba(0, 0, 0, .15);
+      --sheet: #f2f2f7;
+      --sheet-cell: #fff;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--label);
+    font: 17px/1.29 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+    letter-spacing: -.41px;
+  }
+  button { font: inherit; color: inherit; letter-spacing: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  a { color: var(--tint); text-decoration: none; }
+  svg { display: block; }
+  main {
+    max-width: 680px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px calc(var(--tabbar) + 32px);
+  }
+
+  /* Barre de navigation : retour et réglages, fond flouté une fois la page défilée. */
+  .navbar {
+    position: sticky; top: 0; z-index: 20; margin: 0 -16px;
+    padding: calc(env(safe-area-inset-top) + 4px) 8px 4px; height: calc(44px + env(safe-area-inset-top));
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    transition: background .2s, border-color .2s; border-bottom: .5px solid transparent;
+  }
+  .navbar.scrolled { background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-color: var(--sep); }
+  .navbar .small-title { font-weight: 600; font-size: 17px; opacity: 0; transition: opacity .2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .navbar.scrolled .small-title { opacity: 1; }
+  .navbar .back { justify-self: start; display: flex; align-items: center; gap: 2px; color: var(--tint); padding: 8px 4px; }
+  .navbar .actions { justify-self: end; display: flex; gap: 4px; }
+  .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; color: var(--tint); border-radius: 50%; }
+  .icon-btn:active { opacity: .5; }
+  main { padding-top: 0; }
+
+  .large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: .37px; margin: 2px 0 2px; }
+  .caption { color: var(--label-2); font-size: 15px; letter-spacing: -.24px; margin-bottom: 20px; }
+
+  /* Listes groupées en retrait. */
+  .section { margin: 0 0 28px; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 4px 8px; }
+  .section-head h2 { margin: 0; font-size: 20px; line-height: 25px; font-weight: 700; letter-spacing: .38px; }
+  .section-head .aside { color: var(--label-2); font-size: 15px; }
+  .section-foot { color: var(--label-2); font-size: 13px; line-height: 18px; letter-spacing: -.08px; margin: 7px 16px 0; }
+  .group { background: var(--cell); border-radius: var(--r); overflow: hidden; }
+  .row {
+    position: relative; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    min-height: 44px; padding: 11px 16px;
+  }
+  .row + .row::before, .row + .region::before, .region + .region::before {
+    content: ""; position: absolute; top: 0; right: 0; left: var(--inset, 16px); border-top: .5px solid var(--sep);
+  }
+  button.row:active, .row.tap:active { background: var(--cell-2); }
+  .row .body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .row .title { font-size: 17px; overflow-wrap: anywhere; }
+  .row .sub { color: var(--label-2); font-size: 15px; letter-spacing: -.24px; line-height: 20px; }
+  .row .meta { color: var(--label-3); font-size: 13px; letter-spacing: -.08px; line-height: 18px; }
+  .row .trail { flex: none; color: var(--label-2); font-size: 15px; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .chev { color: var(--label-3); flex: none; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .06px; color: var(--tint); background: color-mix(in srgb, var(--tint) 16%, transparent); border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: 2px; }
+  .pill { font-size: 13px; font-weight: 600; letter-spacing: -.08px; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+  .pill.ok { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
+  .pill.miss { color: var(--orange); background: color-mix(in srgb, var(--orange) 15%, transparent); }
+
+  /* Coche ronde, comme dans Rappels. */
+  .check { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--label-3); display: grid; place-items: center; color: #fff; }
+  .done .check { background: var(--green); border-color: var(--green); }
+  .done .title { color: var(--label-2); }
+
+  /* Icône de catégorie : carré arrondi coloré. */
+  .glyph { flex: none; width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: #fff; }
+
+  /* Anneau de progression. */
+  .ring { flex: none; }
+  .ring .track { stroke: var(--fill); }
+  .ring .value { transition: stroke-dashoffset .6s cubic-bezier(.2, .8, .2, 1); }
+
+  /* Carte du personnage. */
+  .hero { background: var(--cell); border-radius: 16px; padding: 16px; margin-bottom: 28px; }
+  .hero-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .hero h2 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: .35px; }
+  .hero .sub { color: var(--label-2); font-size: 15px; margin-top: 2px; }
+  .rings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0 14px; }
+  .rings > div { display: grid; justify-items: center; gap: 6px; text-align: center; }
+  .rings b { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .rings span { color: var(--label-2); font-size: 12px; letter-spacing: 0; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .stats div { background: var(--fill); border-radius: 10px; padding: 7px 4px; text-align: center; font-variant-numeric: tabular-nums; }
+  .stats div b { display: block; font-size: 17px; }
+  .stats div span { color: var(--label-2); font-size: 11px; font-weight: 600; letter-spacing: .07px; }
+  .stats div.build { background: color-mix(in srgb, var(--tint) 22%, transparent); }
+  .stats div.build b, .stats div.build span { color: var(--tint); }
+
+  .bar { height: 4px; background: var(--fill); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; background: var(--tint); border-radius: 2px; }
+
+  /* Recherche et contrôle segmenté. */
+  .toolbar { display: none; gap: 10px; margin: 0 0 20px; }
+  body.r-cat .toolbar { display: grid; }
+  .search { display: flex; align-items: center; gap: 6px; background: var(--fill); border-radius: 10px; height: 36px; padding: 0 8px; color: var(--label-2); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--label); font: inherit; font-size: 17px; letter-spacing: -.41px; }
+  .search input::placeholder { color: var(--label-2); }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--fill); border-radius: 9px; padding: 2px; position: relative; }
+  .segmented button { position: relative; z-index: 1; font-size: 13px; font-weight: 500; letter-spacing: -.08px; height: 28px; border-radius: 7px; white-space: nowrap; padding: 0 8px; }
+  .segmented button[aria-pressed=true] { background: var(--cell); box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04); font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .segmented button[aria-pressed=true] { background: #636366; } }
+
+  /* Régions repliables d'une catégorie. */
+  .region { display: block; position: relative; }
+  .region > summary { list-style: none; cursor: pointer; }
+  .region > summary::-webkit-details-marker { display: none; }
+  .region > summary .chev { transition: transform .25s; }
+  .region[open] > summary .chev { transform: rotate(90deg); }
+  .region > summary .title { font-weight: 600; }
+  .region .items { --inset: 52px; }
+  .region .items .row { padding-left: 16px; }
+  .region .items::before { content: ""; display: block; margin-left: 16px; border-top: .5px solid var(--sep); }
+  .row .sub.info { color: var(--label); opacity: .8; }
+  .row .sub.strong { color: var(--tint); font-weight: 600; }
+  .trail-col { display: grid; justify-items: end; gap: 4px; }
+  .done .info, .done .meta.note { display: none; }
+
+  .empty { color: var(--label-2); text-align: center; padding: 48px 16px; }
+
+  /* Barre d'onglets. */
+  .tabbar {
+    position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; height: var(--tabbar);
+    padding-bottom: env(safe-area-inset-bottom);
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-top: .5px solid var(--sep);
+  }
+  .tabbar button { display: grid; justify-items: center; align-content: center; gap: 2px; color: #999; font-size: 10px; font-weight: 500; letter-spacing: .1px; }
+  .tabbar button[aria-current=page] { color: var(--tint); }
+  body.r-map .tabbar { background: color-mix(in srgb, var(--bar) 92%, transparent); }
+
+  /* Carte plein écran, commandes flottantes en verre. */
+  #map { display: none; position: fixed; inset: 0 0 var(--tabbar) 0; background: #000; z-index: 1; }
+  body.r-map #map { display: block; }
+  body.r-map main { display: none; }
+  .map-ui { display: none; position: fixed; z-index: 10; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 10px) 12px 0; pointer-events: none; }
+  body.r-map .map-ui { display: flex; gap: 8px; align-items: center; justify-content: center; }
+  .glass { pointer-events: auto; background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); box-shadow: var(--shadow); }
+  .map-ui .segmented.glass { flex: 0 1 auto; border-radius: 10px; }
+  .map-ui .segmented.glass button { padding: 0 10px; }
+  .map-ui .icon-btn.glass { flex: none; width: 36px; height: 36px; }
+  .leaflet-container { font: inherit; background: #000; }
+  .leaflet-control-zoom { display: none; }
+  @media (hover: hover) and (pointer: fine) { .leaflet-control-zoom { display: block; } }
+  .leaflet-top.leaflet-left { top: calc(env(safe-area-inset-top) + 56px); }
+
+  /* Feuille modale (sheet). */
+  .backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .4); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 680px; max-height: 88vh; overflow: auto;
+    background: var(--sheet); border-radius: 14px 14px 0 0; padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+    transform: translateY(105%); transition: transform .38s cubic-bezier(.32, .72, 0, 1); box-shadow: var(--shadow);
+    overscroll-behavior: contain;
+  }
+  .sheet .group { background: var(--sheet-cell); }
+  .sheet.open { transform: none; }
+  .grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--label-3); margin: 0 auto 10px; }
+  .sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 4px 0 16px; }
+  .sheet-head h3 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: .35px; }
+  .sheet-head .sub { color: var(--label-2); font-size: 15px; margin-top: 3px; }
+  .close { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--fill); color: var(--label-2); display: grid; place-items: center; }
+  .sheet p.text { margin: 0; padding: 12px 16px; font-size: 15px; line-height: 20px; letter-spacing: -.24px; }
+  .sheet p.text + p.text { border-top: .5px solid var(--sep); }
+  .sheet p.text.hint { color: var(--label-2); font-size: 13px; line-height: 18px; }
+  .sheet p.text .k { display: block; color: var(--label-2); font-size: 13px; margin-bottom: 2px; }
+  .actions-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin-top: 16px; }
+  .btn { height: 50px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .btn.filled { background: var(--tint); color: #000; }
+  @media (prefers-color-scheme: light) { .btn.filled { color: #fff; } }
+  .btn.tinted { background: color-mix(in srgb, var(--tint) 16%, transparent); color: var(--tint); }
+  .btn:active { opacity: .7; }
+
+  /* Interrupteur. */
+  .switch { flex: none; position: relative; width: 51px; height: 31px; }
+  .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 16px; background: var(--fill); transition: background .25s; }
+  .switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .15), 0 3px 1px rgba(0, 0, 0, .06); transition: transform .25s; }
+  .switch input:checked + span { background: var(--green); }
+  .switch input:checked + span::after { transform: translateX(20px); }
+  .dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+
+  .footer { color: var(--label-3); font-size: 12px; text-align: center; margin-top: 8px; }
+  .footer a { color: var(--label-2); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <nav class="navbar" id="navbar">
+    <div id="navLeft"></div>
+    <div class="small-title" id="smallTitle"></div>
+    <div class="actions"><button class="icon-btn" id="settingsBtn" type="button"></button></div>
+  </nav>
+  <div id="top"></div>
+  <div class="toolbar" id="toolbar">
+    <label class="search"><span id="searchIcon"></span><input type="search" id="search" autocomplete="off"></label>
+    <div class="segmented" id="filter"></div>
+  </div>
+  <div id="list"></div>
+</main>
+<div id="map"></div>
+<div class="map-ui" id="mapUi"></div>
+<nav class="tabbar" id="tabbar"></nav>
+<div class="backdrop" id="backdrop"></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true"></section>
+<script>
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+
+// Noms d'objets, de boss et de régions : ceux du jeu, en anglais, avec le nom français
+// officiel dans `fr` quand il est connu. Les indications d'emplacement restent en anglais.
+const I18N = {
+  fr: {
+    loading: "Chargement…", justNow: "à l'instant",
+    ago: (n, u) => `il y a ${n} ${u}`, units: { min: "min", h: "h", d: "j" },
+    updated: (when) => `Mis à jour ${when}`, level: "niv.", noCharacter: "Aucun personnage",
+    search: "Rechercher", misc: "Divers", allDone: "Tout est fait ici.", noMatch: "Aucun résultat",
+    loadError: (m) => `Impossible de charger la progression (${m}).`, data: "Données :",
+    advice: "Pour toi", collection: "Collection", map: "Carte", back: "Collection", settings: "Réglages",
+    all: "Tout", todo: "À faire", of: (n, total) => `${n} sur ${total}`,
+    build: "Build", levelRange: (a, b) => `niv. ${a}–${b}`,
+    zonesNow: "Zones à ton niveau", zonesNowHint: "Fourchettes indicatives des guides communautaires.",
+    catchUp: "À rattraper", catchUpHint: "Zones plus faciles où il reste des boss.",
+    bossesNow: "Boss à ton niveau", weaponsFor: "Armes pour ton build", spellsFor: "Sorts pour ton build",
+    gearHint: "Pas encore en ta possession, dans des zones accessibles. Les plus proches de tes stats d'abord.",
+    talismansNow: "Talismans à récupérer", ready: "Prêt", twoHand: "à deux mains", missing: (s) => `−${s}`,
+    nothing: "Rien à signaler ici.", bossesShort: "boss", gracesShort: "grâces", bosses: "Boss", graces: "Grâces", total: "Collection",
+    classes: ["Vagabond", "Guerrier", "Héros", "Bandit", "Astrologue", "Prophète", "Confesseur", "Samouraï", "Prisonnier", "Misérable"],
+    statNames: { vig: "VIG", min: "ESP", end: "END", str: "FOR", dex: "DEX", int: "INT", fai: "FOI", arc: "ÉSO" },
+    layers: { surface: "Entre-terre", underground: "Souterrain", dlc: "Ombres" },
+    mapFilters: "Sur la carte", mapLegend: "Point plein : à faire. Point creux : fait. Contour en pointillés : position approximative.", mapError: "Impossible de charger la carte.",
+    hideDone: "Masquer ce qui est fait", showDlc: "Inclure le DLC", language: "Langue", character: "Personnage",
+    status: { graces: ["Pas encore activée", "Activée"], bosses: ["À vaincre", "Vaincu"], pickup: ["À ramasser", "Ramassé"], items: ["Pas encore obtenu", "Obtenu"] },
+    nearHint: "Position approximative : le donjon, la grâce ou la zone de 256 m où se trouve l'objet, pas l'endroit exact.", noPos: "Pas de position connue sur la carte.", wiki: "Wiki", seeOnMap: "Voir sur la carte", seeNear: "Voir la zone", skill: "Compétence",
+    effect: "Effet", where: "Emplacement", fexMap: "carte Fextralife", close: "Fermer",
+    buildExtras: "Utile pour ton build", buildExtrasHint: "Emplacements de sorts et de talismans, parchemins à donner aux maîtres de sorts, larmes cristallines pour la fiole.",
+    attackPower: "Attaque", spellPower: "Sorts", comparedTo: (s) => `Plus fortes que ta meilleure arme, au même degré d'amélioration. Comparé à : ${s}.`,
+    cost: (fp, slots) => `${fp} PC · ${slots} empl.`, spiritsFor: "Cendres d'esprit à chercher", spiritsHint: "Les plus appréciées de la communauté, dans l'ordre.",
+    affinities: ["", "lourd", "acéré", "de qualité", "de feu", "pyrotechnique", "de foudre", "sacré", "magique", "de glace", "empoisonné", "sanguin", "occulte"],
+    groups: { progress: "Progression", upgrades: "Améliorations", magic: "Magie", gear: "Équipement", misc: "Divers" },
+  },
+  en: {
+    loading: "Loading…", justNow: "just now",
+    ago: (n, u) => `${n} ${u} ago`, units: { min: "min", h: "h", d: "d" },
+    updated: (when) => `Updated ${when}`, level: "lvl", noCharacter: "No character",
+    search: "Search", misc: "Misc", allDone: "All done here.", noMatch: "No results",
+    loadError: (m) => `Could not load progress (${m}).`, data: "Data:",
+    advice: "For You", collection: "Collection", map: "Map", back: "Collection", settings: "Settings",
+    all: "All", todo: "To do", of: (n, total) => `${n} of ${total}`,
+    build: "Build", levelRange: (a, b) => `lvl ${a}–${b}`,
+    zonesNow: "Areas for your level", zonesNowHint: "Rough ranges from community guides.",
+    catchUp: "Catch up", catchUpHint: "Easier areas with bosses left.",
+    bossesNow: "Bosses for your level", weaponsFor: "Weapons for your build", spellsFor: "Spells for your build",
+    gearHint: "Not owned yet, in areas you can reach. Closest to your stats first.",
+    talismansNow: "Talismans to pick up", ready: "Ready", twoHand: "two-handed", missing: (s) => `−${s}`,
+    nothing: "Nothing to report here.", bossesShort: "bosses", gracesShort: "graces", bosses: "Bosses", graces: "Graces", total: "Collection",
+    classes: ["Vagabond", "Warrior", "Hero", "Bandit", "Astrologer", "Prophet", "Confessor", "Samurai", "Prisoner", "Wretch"],
+    statNames: { vig: "VIG", min: "MND", end: "END", str: "STR", dex: "DEX", int: "INT", fai: "FAI", arc: "ARC" },
+    layers: { surface: "Lands Between", underground: "Underground", dlc: "Shadow" },
+    mapFilters: "On the map", mapLegend: "Filled dot: to do. Hollow dot: done. Dashed outline: approximate position.", mapError: "Could not load the map.",
+    hideDone: "Hide completed", showDlc: "Include DLC", language: "Language", character: "Character",
+    status: { graces: ["Not lit yet", "Lit"], bosses: ["To defeat", "Defeated"], pickup: ["To pick up", "Picked up"], items: ["Not owned yet", "Owned"] },
+    nearHint: "Approximate position: the dungeon, grace or 256 m area where it is, not the exact spot.", noPos: "No known position on the map.", wiki: "Wiki", seeOnMap: "Show on map", seeNear: "Show the area", skill: "Skill",
+    effect: "Effect", where: "Location", fexMap: "Fextralife map", close: "Close",
+    buildExtras: "Useful for your build", buildExtrasHint: "Spell and talisman slots, scrolls for spell teachers, crystal tears for the flask.",
+    attackPower: "AR", spellPower: "Spell", comparedTo: (s) => `Stronger than your best weapon at the same upgrade tier. Compared to: ${s}.`,
+    cost: (fp, slots) => `${fp} FP · ${slots} slot${slots > 1 ? "s" : ""}`, spiritsFor: "Spirit ashes to look for", spiritsHint: "Community favourites, best first.",
+    affinities: ["", "Heavy", "Keen", "Quality", "Fire", "Flame Art", "Lightning", "Sacred", "Magic", "Cold", "Poison", "Blood", "Occult"],
+    groups: { progress: "Progress", upgrades: "Upgrades", magic: "Magic", gear: "Equipment", misc: "Other" },
+  },
+};
+const browserLang = (navigator.language || "fr").toLowerCase().startsWith("fr") ? "fr" : "en";
+const state = {
+  catalog: null, progress: null, char: 0, open: new Map(),
+  lang: I18N[store.get("lang")] ? store.get("lang") : browserLang,
+  route: "",
+};
+const t = () => I18N[state.lang];
+const nameOf = (i) => (state.lang === "fr" && i.fr) || i.name;
+const noteOf = (i) => (state.lang === "fr" && i.noteFr) || i.note;
+// Source des indications d'emplacement (`noteBy` du catalogue) ; `mapNote` vient de la carte du wiki Fextralife.
+const NOTE_BY = { ringwatch: "RingWatch", saveforge: "SaveForge", "er-save-parser": "er-save-parser", mapinteractive: "EldenRing_MapInteractive" };
+const whereFrom = (source) => source ? `${t().where} · ${source}` : t().where;
+const regionOf = (r) => (state.lang === "fr" && state.catalog.regionNames[r]) || r;
+const pref = (id, def) => (store.get(id) ?? def) === "1";
+
+// Icônes au trait, dans l'esprit des SF Symbols.
+const ICONS = {
+  sparkles: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+  map: '<path d="M9 4.5L3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z"/><path d="M9 4.5v12.7M15 6.8v12.7"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.8"/>',
+  right: '<path d="M9.5 5.5L16 12l-6.5 6.5"/>',
+  left: '<path d="M15 4.5L7.5 12l7.5 7.5"/>',
+  more: '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="12" r=".6" fill="currentColor"/><circle cx="12" cy="12" r=".6" fill="currentColor"/><circle cx="16" cy="12" r=".6" fill="currentColor"/>',
+  filter: '<path d="M4 7h16M7 12h10M10 17h4"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l4.5 4.5"/>',
+  check: '<path d="M6 12.5l4 4 8-9"/>',
+  x: '<path d="M7 7l10 10M17 7L7 17"/>',
+  external: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M17 13.5V18a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h4.5"/>',
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  flag: '<path d="M6 21V4M6 4.5h11l-2 4 2 4H6"/>',
+  up: '<circle cx="12" cy="12" r="8.5"/><path d="M12 16.5v-9M8 11l4-4 4 4"/>',
+  shield: '<path d="M12 3.5l7 2.6v5.4c0 4.4-3 7.9-7 9-4-1.1-7-4.6-7-9V6.1z"/>',
+  book: '<path d="M5 5.5A2 2 0 0 1 7 3.5h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20.5v-15"/>',
+};
+function icon(name, size = 24, weight = 1.8) {
+  const s = document.createElement("span");
+  s.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${weight}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+  return s.firstChild;
+}
+
+// Catégories de la collection, regroupées comme les réglages d'iOS.
+const GROUPS = [
+  { id: "progress", color: "#ff453a", icon: "flag", cats: ["bosses", "graces"] },
+  { id: "upgrades", color: "#d9a520", icon: "up", cats: ["flasks", "memorystones", "pouches", "crystaltears", "keys", "scadutree", "revered"] },
+  { id: "magic", color: "#bf5af2", icon: "sparkles", cats: ["sorceries", "incantations", "scrolls", "spirits"] },
+  { id: "gear", color: "#0a84ff", icon: "shield", cats: ["weapons", "shields", "armor", "talismans", "ashes"] },
+  { id: "misc", color: "#8e8e93", icon: "book", cats: ["bellbearings", "whetblades", "cookbooks"] },
+];
+const groupOf = (catId) => GROUPS.find((g) => g.cats.includes(catId)) || GROUPS[GROUPS.length - 1];
+
+// Page du wiki Fextralife (en anglais, le plus complet), d'après le nom anglais du jeu.
+// Sans les précisions des sources : « (Limgrave) », affinité des pierres à aiguiser.
+function wikiUrl(i) {
+  const name = i.name
+    .replace(/Cookbook(\d?)\[(\d+)\]$/, "Cookbook ($1$2)")
+    .replace(/ \((?!\d+\))[^()]*\)$/, "");
+  return "https://eldenring.wiki.fextralife.com/" + encodeURIComponent(name).replace(/%20/g, "+");
+}
+// Ce que fait l'objet, d'après les textes du jeu : compétence et effet passif d'une
+// arme, puis sa ligne d'effet (ou le début de sa description).
+function effectText(i) {
+  const n = state.lang === "fr" ? 1 : 0, T = t();
+  return [i.fp !== undefined && T.cost(i.fp, i.slots), i.skill && `${T.skill} : ${i.skill[n]}`, i.effect?.[n], i.info?.[n]].filter(Boolean).join(" · ");
+}
+
+function ago(secs) {
+  const d = Math.max(0, Date.now() / 1000 - secs), { units } = t();
+  if (d < 90) return t().justNow;
+  if (d < 3600) return t().ago(Math.round(d / 60), units.min);
+  if (d < 86400) return t().ago(Math.round(d / 3600), units.h);
+  return t().ago(Math.round(d / 86400), units.d);
+}
+
+function playtime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
+}
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") e.className = v; else if (k.startsWith("on") || k in e) e[k] = v; else e.setAttribute(k, v);
+  }
+  e.append(...children.flat().filter((c) => c !== null && c !== undefined && c !== false && c !== ""));
+  return e;
+}
+
+function bar(done, total) {
+  return el("div", { class: "bar" }, el("i", { style: `width:${total ? (100 * done / total).toFixed(1) : 0}%` }));
+}
+
+function ring(done, total, size = 44, width = 5, color = "var(--tint)") {
+  const r = (size - width) / 2, c = 2 * Math.PI * r, f = total ? done / total : 0;
+  const s = document.createElement("span");
+  s.innerHTML = `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+    <circle class="track" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke-width="${width}"/>
+    <circle class="value" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>`;
+  return s.firstChild;
+}
+
+const tag = (i) => (i.dlc ? el("span", { class: "tag" }, "DLC") : null);
+const section = (title, rows, { foot, aside } = {}) => el("section", { class: "section" },
+  title && el("div", { class: "section-head" }, el("h2", {}, title), aside && el("span", { class: "aside" }, aside)),
+  el("div", { class: "group" }, rows.length ? rows : el("div", { class: "row" }, el("div", { class: "body" }, el("span", { class: "sub" }, t().nothing)))),
+  foot && el("p", { class: "section-foot" }, foot));
+
+// --- Navigation ---------------------------------------------------------------------
+
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h === "map" || h === "collection" || h === "advice") return { tab: h };
+  if (h.startsWith("c/")) return { tab: "collection", cat: h.slice(2) };
+  // Anciennes adresses : #graces, #bosses…
+  if (state.catalog?.categories.some((c) => c.id === h)) return { tab: "collection", cat: h };
+  return { tab: "advice" };
+}
+const go = (hash) => { if (location.hash.slice(1) !== hash) location.hash = hash; else render(); };
+
+function renderTabbar(current) {
+  const T = t();
+  $("tabbar").replaceChildren(...[["advice", "sparkles", T.advice], ["map", "map", T.map], ["collection", "grid", T.collection]].map(([id, ic, label]) =>
+    el("button", { type: "button", "aria-current": id === current ? "page" : null, onclick: () => go(id) }, icon(ic, 26, 1.7), label)));
+}
+
+function renderNavbar(r, title) {
+  const T = t();
+  $("navLeft").replaceChildren(r.cat ? el("button", { class: "back", type: "button", onclick: () => go("collection") }, icon("left", 24, 2.2), T.back) : "");
+  $("smallTitle").textContent = title;
+  $("settingsBtn").replaceChildren(icon("more", 24, 1.7));
+  $("settingsBtn").setAttribute("aria-label", T.settings);
+}
+
+// --- Rendu --------------------------------------------------------------------------
+
+// Avancement d'un personnage, d'où viennent tous les compteurs de la page : les entrées
+// de chaque catégorie (sans le DLC s'il est masqué) et celles qui sont faites.
+function tracker(c) {
+  const dlc = pref("showDlc", "1");
+  const itemsOf = (cat) => (dlc ? cat.items : cat.items.filter((i) => !i.dlc));
+  const doneOf = (cat) => new Set(c.done[cat.id] || []);
+  // [faites, total] pour la catégorie, ou pour celles de ses entrées qui passent `keep`.
+  const count = (cat, keep = () => true) => {
+    const items = itemsOf(cat).filter(keep), done = doneOf(cat);
+    return [items.filter((i) => done.has(i.id)).length, items.length];
+  };
+  return { c, dlc, itemsOf, doneOf, count };
+}
+
+function render() {
+  document.documentElement.lang = state.lang;
+  const T = t(), r = route();
+  renderTabbar(r.tab);
+  document.body.className = `r-${r.cat ? "cat" : r.tab}`;
+  const { catalog, progress } = state;
+  if (!catalog) return;
+  const c = progress.characters[state.char];
+  if (!c) { $("top").replaceChildren(el("h1", { class: "large-title" }, T.noCharacter)); return; }
+
+  const ctx = tracker(c);
+  const caption = `${c.name} · ${T.level} ${c.level} · ${playtime(c.seconds)} · ${T.updated(ago(progress.updated))}`;
+
+  if (r.tab === "map") return renderMap(ctx);
+  if (r.cat) {
+    const cat = catalog.categories.find((x) => x.id === r.cat);
+    if (!cat) return go("collection");
+    renderNavbar(r, cat.label[state.lang]);
+    return renderCategory(cat, ctx);
+  }
+  const title = r.tab === "collection" ? T.collection : T.advice;
+  renderNavbar(r, title);
+  $("top").replaceChildren(el("h1", { class: "large-title" }, title), el("div", { class: "caption" }, caption));
+  if (r.tab === "collection") renderCollection(ctx); else renderAdvice(ctx);
+}
+
+function itemRow(i, { done = false, trail = null, catId = null, showRegion = false, extra = null } = {}) {
+  const effect = effectText(i);
+  return el("button", { class: `row${done ? " done" : ""}`, type: "button", onclick: () => openItem(i, catId, done) },
+    catId !== null && el("span", { class: "check" }, done && icon("check", 16, 2.6)),
+    el("span", { class: "body" },
+      el("span", { class: "title" }, nameOf(i), tag(i)),
+      extra && el("span", { class: "sub strong" }, extra),
+      effect && el("span", { class: "sub info" }, effect),
+      (showRegion || i.note || i.mapNote) && el("span", { class: "meta note" }, [showRegion && regionOf(i.region), noteOf(i) || i.mapNote].filter(Boolean).join(" — "))),
+    trail);
+}
+
+function renderCollection({ itemsOf, count }) {
+  const T = t(), cats = state.catalog.categories.filter((cat) => itemsOf(cat).length);
+  const out = GROUPS.map((g) => {
+    const rows = cats.filter((cat) => groupOf(cat.id) === g).map((cat) => {
+      const [n, total] = count(cat);
+      return el("button", { class: "row", type: "button", style: "--inset:58px", onclick: () => go(`c/${cat.id}`) },
+        el("span", { class: "glyph", style: `background:${g.color}` }, icon(g.icon, 18, 2)),
+        el("span", { class: "body" }, el("span", { class: "title" }, cat.label[state.lang])),
+        el("span", { class: "trail" }, `${n}/${total}`, ring(n, total, 22, 3, n === total ? "var(--green)" : "var(--tint)"), el("span", { class: "chev" }, icon("right", 14, 2.4))));
+    });
+    return rows.length ? section(T.groups[g.id], rows) : null;
+  });
+  $("list").replaceChildren(...out.filter(Boolean), sources());
+}
+
+function sources() {
+  return el("p", { class: "footer" }, t().data, " ",
+    ...[["ER-Save-Editor", "https://github.com/ClayAmore/ER-Save-Editor"], ["SaveForge", "https://github.com/oisis/EldenRing-SaveForge"],
+      ["RingWatch", "https://github.com/Cidan/RingWatch"], ["EldenRing_MapInteractive", "https://github.com/CreateDDy/EldenRing_MapInteractive"],
+      ["er-save-parser", "https://github.com/zebbedaja/er-save-parser"], ["eldenring-convergence-fr", "https://github.com/pazix/eldenring-convergence-fr"]]
+      .flatMap(([n, u], k) => [k ? ", " : "", el("a", { href: u, target: "_blank", rel: "noopener" }, n)]), ".");
+}
+
+// En-tête et barre d'outils d'une catégorie ; la liste se refait seule à la saisie.
+function renderCategory(cat, ctx) {
+  const T = t(), [n, total] = ctx.count(cat);
+  $("top").replaceChildren(
+    el("h1", { class: "large-title" }, cat.label[state.lang]),
+    el("div", { class: "caption" }, `${T.of(n, total)} · ${Math.round(100 * n / total)} %`, bar(n, total)));
+  $("search").placeholder = T.search;
+  $("searchIcon").replaceChildren(icon("search", 17, 2));
+  const hide = pref("hideDone", "0");
+  $("filter").replaceChildren(...[[false, T.all], [true, T.todo]].map(([v, label]) =>
+    el("button", { type: "button", "aria-pressed": String(hide === v), onclick: () => { store.set("hideDone", v ? "1" : "0"); render(); } }, label)));
+  renderCategoryList(cat, ctx);
+}
+
+function renderCategoryList(cat, { itemsOf, doneOf }) {
+  const T = t(), done = doneOf(cat), all = itemsOf(cat);
+  const q = $("search").value.trim().toLowerCase(), hide = pref("hideDone", "0");
+  const groups = new Map();
+  for (const it of all) {
+    const key = it.region || T.misc;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+  const out = [];
+  for (const [region, items] of groups) {
+    const got = items.filter((i) => done.has(i.id)).length;
+    const shown = items.filter((i) => (!hide || !done.has(i.id))
+      && (!q || [i.name, i.fr || "", region, regionOf(region), i.note || "", i.mapNote || ""].some((s) => s.toLowerCase().includes(q))));
+    if (!shown.length) continue;
+    const key = `${cat.id}/${region}`;
+    const d = el("details", { class: "region" });
+    // Par défaut, seules les régions entamées sont dépliées.
+    d.open = q !== "" || (state.open.get(key) ?? (got > 0 && got < items.length));
+    d.ontoggle = () => { if (!q) state.open.set(key, d.open); };
+    d.append(
+      el("summary", { class: "row tap" },
+        el("span", { class: "body" }, el("span", { class: "title" }, regionOf(region))),
+        el("span", { class: "trail" }, `${got}/${items.length}`, ring(got, items.length, 22, 3, got === items.length ? "var(--green)" : "var(--tint)"), el("span", { class: "chev" }, icon("right", 14, 2.4)))),
+      el("div", { class: "items" }, ...shown.map((i) => itemRow(i, { done: done.has(i.id), catId: cat.id }))));
+    out.push(d);
+  }
+  $("list").replaceChildren(out.length ? el("div", { class: "group" }, ...out) : el("p", { class: "empty" }, hide && !q ? T.allDone : T.noMatch));
+}
+
+const OFFENSIVE = ["str", "dex", "int", "fai", "arc"];
+const GOOD_GRADES = new Set(["S", "A", "B", "C"]);
+// Larmes cristallines qui servent un attribut offensif (noms anglais du jeu).
+const BUILD_TEARS = {
+  str: ["Strength-knot Crystal Tear", "Stonebarb Cracked Tear"],
+  dex: ["Dexterity-knot Crystal Tear", "Thorny Cracked Tear"],
+  int: ["Intelligence-knot Crystal Tear", "Magic-Shrouding Cracked Tear", "Cerulean Hidden Tear"],
+  fai: ["Faith-knot Crystal Tear", "Holy-Shrouding Cracked Tear", "Flame-Shrouding Cracked Tear", "Lightning-Shrouding Cracked Tear", "Cerulean Hidden Tear"],
+};
+
+// Cendres d'esprit les plus appréciées (noms anglais du jeu), de la meilleure à la moins bonne.
+const SPIRIT_PICKS = [
+  "Mimic Tear Ashes", "Black Knife Tiche", "Lhutel the Headless", "Dung Eater Puppet", "Banished Knight Oleg",
+  "Latenna the Albinauric", "Spirit Jellyfish Ashes", "Lone Wolf Ashes", "Banished Knight Engvall", "Kaiden Sellsword Ashes",
+  "Finger Maiden Therolina Puppet", "Nightmaiden & Swordstress Puppets", "Omenkiller Rollo", "Cleanrot Knight Finlay",
+  "Ancient Dragon Knight Kristoff", "Redmane Knight Ogha", "Bloodhound Knight Floh", "Greatshield Soldier Ashes",
+  "Battlemage Hugues", "Fanged Imp Ashes", "Nepheli Loux Puppet", "Dolores the Sleeping Arrow Puppet",
+];
+const ATTRS = ["str", "dex", "int", "fai", "arc"];
+const reqSum = (i) => Object.values(i.req || {}).reduce((a, b) => a + b, 0);
+const raised = (stats, req = {}) => ({ ...stats, ...Object.fromEntries(Object.entries(req).map(([s, n]) => [s, Math.max(stats[s], n)])) });
+const maxLevel = (id) => (state.weapons.reinforce[state.weapons.weapons[id]?.[4]]?.length || 1) - 1;
+
+// Puissance d'une arme : attaque (somme des dégâts) et puissance des sorts pour un
+// catalyseur. Même calcul que elden-ring-weapon-calculator (ThomasJClark, MIT), sans les
+// effets de statut. Les données viennent de tools/extract_stats.py.
+function weaponPower(id, level, stats, twoHand = false) {
+  const D = state.weapons, w = D.weapons[id];
+  const [req, base, correct, elementId, reinforceId, graphs, tool] = w;
+  const levels = D.reinforce[reinforceId], [rate, scale] = levels[Math.max(0, Math.min(level || 0, levels.length - 1))], scale0 = levels[0][1];
+  const attrs = ATTRS.map((a) => Math.min(148, a === "str" && twoHand ? Math.floor(stats.str * 1.5) : stats[a]));
+  const weak = new Set(ATTRS.filter((a, k) => req[k] && attrs[k] < req[k]));
+  let ar = 0, spell = 0;
+  for (let t = 0; t < 5; t++) {
+    const b = base[t] * rate[t];
+    if (!b && !tool) continue;
+    const scaling = D.elements[elementId][t];
+    let total = 1;
+    if (Object.keys(scaling).some((a) => weak.has(a))) total = 0.6;
+    else for (const [a, over] of Object.entries(scaling)) {
+      const k = ATTRS.indexOf(a), s = correct[k] / 100 * scale[k], s0 = correct[k] / 100 * scale0[k];
+      const eff = over === 1 ? s : s0 ? over * s / s0 : 0;
+      total += (D.graphs[graphs[t]]?.[attrs[k]] ?? 0) * eff;
+    }
+    ar += b * total;
+    if ((tool === 1 && t === 1) || (tool === 2 && t === 4)) spell = 100 * total;
+  }
+  return { ar: Math.floor(ar), spell: Math.floor(spell), tool };
+}
+
+// Meilleure arme possédée qu'on peut manier : catalyseur du build et arme de corps à corps.
+function bestOwned(c, tool) {
+  const out = { tool: null, melee: null };
+  if (!state.weapons) return out;
+  for (const [id, level] of c.weapons || []) {
+    const w = state.weapons.weapons[id];
+    if (!w || w[0].some((r, k) => r > c.stats[ATTRS[k]] * (k === 0 ? 1.5 : 1))) continue;
+    if (tool && w[6] === tool) {
+      const value = weaponPower(id, level, c.stats).spell;
+      if (!out.tool || value > out.tool.value) out.tool = { id, level, value, tool: true };
+    } else if (!w[6]) {
+      const value = Math.max(weaponPower(id, level, c.stats).ar, weaponPower(id, level, c.stats, true).ar);
+      if (!out.melee || value > out.melee.value) out.melee = { id, level, value };
+    }
+  }
+  return out;
+}
+
+// Nom d'une arme possédée : celui du catalogue, avec son affinité.
+function weaponName(id) {
+  const base = id - id % 10000, aff = (id % 10000) / 100;
+  const item = state.catalog.categories.filter((x) => x.source === "weapon").flatMap((x) => x.items).find((i) => i.id === base);
+  const name = item ? nameOf(item) : String(base), label = t().affinities[aff] || "";
+  return !label ? name : state.lang === "fr" ? `${name} ${label}` : `${label} ${name}`;
+}
+
+// Le build : les attributs offensifs à 3 points ou moins du plus haut (au moins 15).
+function buildStats(stats) {
+  const top = Math.max(...OFFENSIVE.map((s) => stats[s]));
+  return OFFENSIVE.filter((s) => stats[s] >= Math.max(15, top - 3));
+}
+
+// Points manquants pour manier l'objet ; la force compte ×1,5 à deux mains.
+function missingReq(item, stats) {
+  const miss = {};
+  let twoHand = false;
+  for (const [s, need] of Object.entries(item.req || {})) {
+    if (stats[s] >= need) continue;
+    if (s === "str" && Math.floor(stats.str * 1.5) >= need) { twoHand = true; continue; }
+    miss[s] = need - stats[s];
+  }
+  return { miss, total: Object.values(miss).reduce((a, b) => a + b, 0), twoHand };
+}
+
+function renderAdvice({ c, dlc, itemsOf, doneOf, count }) {
+  const { catalog } = state, T = t(), lv = c.level;
+  const build = buildStats(c.stats);
+  const regions = catalog.regions.filter((r) => (dlc || !r.dlc) && r.name !== "Roundtable Hold");
+  const rank = new Map(catalog.regions.map((r, i) => [r.name, i]));
+  const reachable = new Set(regions.filter((r) => r.min <= lv + 5).map((r) => r.name));
+  const cat = (id) => catalog.categories.find((x) => x.id === id);
+  const left = (id, region) => {
+    const done = doneOf(cat(id));
+    return itemsOf(cat(id)).filter((i) => i.region === region && !done.has(i.id));
+  };
+  const totals = catalog.categories.map((x) => count(x)).reduce((a, b) => [a[0] + b[0], a[1] + b[1]], [0, 0]);
+
+  const ringStat = ([n, total], label) => el("div", {}, ring(n, total, 58, 6), el("b", {}, `${Math.round(100 * n / (total || 1))} %`), el("span", {}, label));
+  const hero = el("section", { class: "hero" },
+    el("div", { class: "hero-top" },
+      el("div", {}, el("h2", {}, c.name), el("div", { class: "sub" }, `${T.classes[c.class] ?? "?"} · ${T.level} ${c.level} · ${T.build} ${build.map((s) => T.statNames[s]).join(" / ") || "—"}`))),
+    el("div", { class: "rings" }, ringStat(count(cat("bosses")), T.bosses), ringStat(count(cat("graces")), T.graces), ringStat(totals, T.total)),
+    el("div", { class: "stats" }, ...Object.entries(c.stats).map(([s, v]) =>
+      el("div", { class: build.includes(s) ? "build" : null }, el("b", {}, v), el("span", {}, T.statNames[s])))));
+
+  const zone = (r) => {
+    const inZone = (i) => i.region === r.name;
+    const [bossDone, bossTotal] = count(cat("bosses"), inZone), [graceDone, graceTotal] = count(cat("graces"), inZone);
+    return el("div", { class: "row" },
+      el("span", { class: "body" },
+        el("span", { class: "title" }, regionOf(r.name), r.dlc ? el("span", { class: "tag" }, "DLC") : null),
+        el("span", { class: "meta" }, `${T.bossesShort} ${bossDone}/${bossTotal} · ${T.gracesShort} ${graceDone}/${graceTotal}`),
+        bar(bossDone + graceDone, bossTotal + graceTotal)),
+      el("span", { class: "trail" }, T.levelRange(r.min, r.max)));
+  };
+  const row = (i, trail = null) => itemRow(i, { trail, showRegion: true });
+
+  const now = regions.filter((r) => r.min <= lv + 5 && r.max >= lv - 5);
+  const behind = regions.filter((r) => r.max < lv - 5 && left("bosses", r.name).length);
+  const bosses = now.flatMap((r) => left("bosses", r.name)).slice(0, 12);
+
+  // Équipement : pas encore possédé, dans une zone accessible, qui profite du build.
+  const candidates = (ids) => ids.flatMap((id) => {
+    const done = doneOf(cat(id));
+    return itemsOf(cat(id)).filter((i) => !done.has(i.id) && reachable.has(i.region) && !/remembrance/i.test(i.note || "")
+      && build.some((s) => GOOD_GRADES.has(i.scaling?.[s]) || (i.req?.[s] && !i.scaling)));
+  }).map((i) => ({ i, m: missingReq(i, c.stats) })).filter(({ m }) => m.total <= 15);
+  const missPill = (m) => el("span", { class: "pill miss" }, Object.entries(m.miss).map(([s, n]) => `${T.missing(n)} ${T.statNames[s]}`).join(" "));
+  const spellCats = [...(build.includes("int") ? ["sorceries"] : []), ...(build.some((s) => s === "fai" || s === "arc") ? ["incantations"] : [])];
+
+  // Armes : comparées à la meilleure arme possédée, au même degré d'amélioration
+  // (puissance des sorts pour un bâton ou un sceau, puissance d'attaque sinon).
+  const tool = build.includes("int") ? 1 : build.includes("fai") ? 2 : 0;
+  const best = bestOwned(c, tool);
+  let weapons, weaponsFoot = T.gearHint;
+  if (state.weapons && (best.melee || best.tool)) {
+    weapons = candidates(["weapons", "shields"]).map(({ i, m }) => {
+      const w = state.weapons.weapons[i.id];
+      if (!w) return null;
+      const isTool = tool && w[6] === tool, ref = isTool ? best.tool : best.melee;
+      if (!ref) return null;
+      const level = maxLevel(ref.id) ? Math.round(ref.level / maxLevel(ref.id) * maxLevel(i.id)) : 0;
+      const stats = raised(c.stats, i.req);
+      const value = isTool ? weaponPower(i.id, level, stats).spell
+        : Math.max(weaponPower(i.id, level, stats).ar, weaponPower(i.id, level, stats, true).ar);
+      return { i, m, value, gain: value - ref.value, level, isTool };
+    }).filter((x) => x && x.gain > 0)
+      .sort((a, b) => (a.m.total > 0) - (b.m.total > 0) || b.gain - a.gain).slice(0, 10)
+      .map(({ i, m, value, gain, level, isTool }) => itemRow(i, {
+        showRegion: true,
+        extra: `${isTool ? T.spellPower : T.attackPower} ${value}${level ? ` (+${level})` : ""}`,
+        trail: m.total ? el("span", { class: "trail-col" }, el("span", { class: "pill ok" }, `+${gain}`), missPill(m)) : el("span", { class: "pill ok" }, `+${gain}`),
+      }));
+    weaponsFoot = T.comparedTo([best.tool, best.melee].filter(Boolean).map((b) => `${weaponName(b.id)}${b.level ? ` +${b.level}` : ""} (${b.tool ? T.spellPower : T.attackPower} ${b.value})`).join(", "));
+  } else {
+    weapons = candidates(["weapons", "shields"])
+      .sort((a, b) => a.m.total - b.m.total || rank.get(a.i.region) - rank.get(b.i.region)).slice(0, 10)
+      .map(({ i, m }) => row(i, m.total ? missPill(m) : el("span", { class: "pill ok" }, m.twoHand ? `${T.ready} · 2H` : T.ready)));
+  }
+
+  // Sorts : ceux qu'on peut lancer d'abord, les plus exigeants (donc les plus forts) en
+  // tête ; puis ceux qui demandent encore quelques points.
+  const spells = candidates(spellCats)
+    .sort((a, b) => (a.m.total > 0) - (b.m.total > 0) || (a.m.total ? a.m.total - b.m.total : reqSum(b.i) - reqSum(a.i)))
+    .slice(0, 8)
+    .map(({ i, m }) => row(i, m.total ? missPill(m) : el("span", { class: "pill ok" }, T.ready)));
+
+  // Cendres d'esprit : les plus appréciées de la communauté, dans l'ordre.
+  const spiritsCat = cat("spirits"), ownedSpirits = doneOf(spiritsCat);
+  const spirits = SPIRIT_PICKS.map((n) => itemsOf(spiritsCat).find((i) => i.name === n))
+    .filter((i) => i && !ownedSpirits.has(i.id)).slice(0, 6).map((i) => row(i));
+  const talismans = itemsOf(cat("talismans")).filter((i) => !doneOf(cat("talismans")).has(i.id) && reachable.has(i.region))
+    .sort((a, b) => rank.get(a.region) - rank.get(b.region)).slice(0, 8).map((i) => row(i));
+
+  // Collectibles utiles au build : mémolithes pour un lanceur de sorts, bourses à
+  // talismans, parchemins ou bréviaires, larmes cristallines liées aux attributs du build.
+  const wanted = (id, test = () => true) => itemsOf(cat(id)).filter((i) => !doneOf(cat(id)).has(i.id) && test(i));
+  const tears = new Set(["Opaline Hardtear", "Crimsonburst Crystal Tear", ...build.flatMap((s) => BUILD_TEARS[s] || [])]);
+  const extras = [
+    ...(spellCats.length ? wanted("memorystones") : []),
+    ...wanted("pouches"),
+    ...wanted("scrolls", (i) => (build.includes("int") && /Scroll$/.test(i.name)) || (build.includes("fai") && /Prayerbook$/.test(i.name))),
+    ...wanted("crystaltears", (i) => tears.has(i.name)),
+  ].sort((a, b) => (rank.get(a.region) ?? 99) - (rank.get(b.region) ?? 99)).slice(0, 12).map((i) => row(i));
+
+  $("list").replaceChildren(
+    hero,
+    section(T.zonesNow, now.map(zone), { foot: T.zonesNowHint }),
+    behind.length ? section(T.catchUp, behind.map(zone), { foot: T.catchUpHint }) : null,
+    section(T.buildExtras, extras, { foot: T.buildExtrasHint }),
+    section(T.bossesNow, bosses.map((b) => row(b))),
+    section(T.weaponsFor, weapons, { foot: weaponsFoot }),
+    spellCats.length ? section(T.spellsFor, spells) : null,
+    section(T.spiritsFor, spirits, { foot: T.spiritsHint }),
+    section(T.talismansNow, talismans),
+    sources(),
+  );
+}
+
+// --- Feuilles -----------------------------------------------------------------------
+
+function openSheet(...content) {
+  $("sheet").replaceChildren(el("div", { class: "grabber" }), ...content.filter(Boolean));
+  $("sheet").scrollTop = 0;
+  requestAnimationFrame(() => { $("sheet").classList.add("open"); $("backdrop").classList.add("open"); });
+}
+function closeSheet() { $("sheet").classList.remove("open"); $("backdrop").classList.remove("open"); }
+$("backdrop").onclick = closeSheet;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+
+const sheetHead = (title, sub) => el("div", { class: "sheet-head" },
+  el("div", {}, el("h3", {}, title), sub && el("div", { class: "sub" }, sub)),
+  el("button", { class: "close", type: "button", "aria-label": t().close, onclick: closeSheet }, icon("x", 16, 2.4)));
+
+// Fiche d'un objet : effet, emplacement, état ; liens vers la carte et le wiki.
+function openItem(i, catId, done, fromMap = false) {
+  const T = t();
+  const catOfItem = catId ? state.catalog.categories.find((x) => x.id === catId)
+    : state.catalog.categories.find((x) => x.items.includes(i));
+  const c = state.progress.characters[state.char];
+  const ok = done || (catOfItem && (c.done[catOfItem.id] || []).includes(i.id));
+  const kind = MAP_KINDS.find((k) => k.id === catOfItem?.id);
+  const statusList = T.status[catOfItem?.id] || (kind?.pickup || catOfItem?.source === "flag" ? T.status.pickup : T.status.items);
+  const effect = effectText(i);
+  const texts = [
+    effect && el("p", { class: "text" }, el("span", { class: "k" }, T.effect), effect),
+    i.note && el("p", { class: "text" }, el("span", { class: "k" }, whereFrom(NOTE_BY[i.noteBy])), noteOf(i)),
+    i.mapNote && el("p", { class: "text" }, el("span", { class: "k" }, whereFrom(T.fexMap)), i.mapNote),
+    kind && (!i.pos || i.near) && el("p", { class: "text hint" }, i.pos ? T.nearHint : T.noPos),
+  ].filter(Boolean);
+  openSheet(
+    sheetHead(nameOf(i), [regionOf(i.region), statusList[ok ? 1 : 0]].filter(Boolean).join(" · ")),
+    texts.length ? el("div", { class: "group" }, texts) : null,
+    el("div", { class: "actions-row" },
+      i.pos && kind && !fromMap && el("button", { class: "btn filled", type: "button", onclick: () => { closeSheet(); showOnMap(i, kind.id); } }, icon("pin", 18, 2), i.near ? T.seeNear : T.seeOnMap),
+      el("a", { class: "btn tinted", href: wikiUrl(i), target: "_blank", rel: "noopener" }, T.wiki, icon("external", 16, 2))));
+}
+
+function openSettings() {
+  const T = t(), chars = state.progress?.characters || [];
+  const switchRow = (id, def, label) => el("label", { class: "row" },
+    el("span", { class: "body" }, el("span", { class: "title" }, label)),
+    el("span", { class: "switch" }, el("input", { type: "checkbox", checked: pref(id, def), onchange: (e) => { store.set(id, e.target.checked ? "1" : "0"); render(); } }), el("span")));
+  const langRow = el("div", { class: "row" }, el("span", { class: "body" }, el("span", { class: "title" }, T.language)),
+    el("div", { class: "segmented", style: "width:120px" }, ...["fr", "en"].map((l) =>
+      el("button", { type: "button", "aria-pressed": String(state.lang === l), onclick: () => { state.lang = l; store.set("lang", l); render(); openSettings(); } }, l.toUpperCase()))));
+  openSheet(
+    sheetHead(T.settings, state.progress ? T.updated(ago(state.progress.updated)) : ""),
+    section(null, [langRow, switchRow("showDlc", "1", T.showDlc), switchRow("hideDone", "0", T.hideDone)]),
+    chars.length > 1 ? section(T.character, chars.map((x, k) => el("button", { class: "row", type: "button", onclick: () => { state.char = k; store.set("char", k); render(); closeSheet(); } },
+      el("span", { class: "body" }, el("span", { class: "title" }, x.name), el("span", { class: "sub" }, `${T.level} ${x.level} · ${playtime(x.seconds)}`)),
+      k === state.char && el("span", { style: "color:var(--tint)" }, icon("check", 20, 2.4))))) : null,
+    sources());
+}
+$("settingsBtn").onclick = openSettings;
+
+// --- Carte --------------------------------------------------------------------------
+
+// Les fonds d'EldenRing_MapInteractive découpés par tools/gen_tiles.py. Les positions
+// sont des pixels de l'image d'origine, qui est à 1:1 au zoom natif.
+const LAYER_IDS = ["surface", "underground", "dlc"];
+const mapState = { map: null, meta: null, tiles: null, markers: null, shown: -1, layer: Number(store.get("layer")) || 0, focus: null };
+// Dans l'ordre de dessin : les boss en dernier, en anneau plus large, car les boss de
+// donjon partagent la position de leur grâce.
+const MAP_KINDS = [
+  { id: "graces", color: "#e2bf6a", radius: 5 },
+  { id: "flasks", color: "#7fd4e8", radius: 5, pickup: true },
+  { id: "scadutree", color: "#7fd4e8", radius: 5, pickup: true },
+  { id: "revered", color: "#5fd0a8", radius: 5, pickup: true },
+  { id: "sorceries", color: "#a99bff", radius: 4.5 },
+  { id: "incantations", color: "#f0a35a", radius: 4.5 },
+  { id: "memorystones", color: "#f07ad0", radius: 6, pickup: true },
+  { id: "pouches", color: "#f07ad0", radius: 6, pickup: true },
+  { id: "scrolls", color: "#c9a0ff", radius: 5, pickup: true },
+  { id: "crystaltears", color: "#9fe0ff", radius: 5, pickup: true },
+  { id: "keys", color: "#b8b8b8", radius: 4.5, pickup: true },
+  { id: "bellbearings", color: "#e8c46a", radius: 5, pickup: true },
+  { id: "spirits", color: "#5fd0a8", radius: 4.5 },
+  { id: "talismans", color: "#d9d9d9", radius: 4.5 },
+  { id: "weapons", color: "#b0b8c8", radius: 4, hidden: true },
+  { id: "shields", color: "#8f9bb0", radius: 4, hidden: true },
+  { id: "armor", color: "#c8a888", radius: 4, hidden: true },
+  { id: "ashes", color: "#e8e070", radius: 4, hidden: true },
+  { id: "bosses", color: "#e0634a", radius: 8, ring: true },
+];
+// Catégories masquées : le choix du visiteur, sinon les plus nombreuses (`hidden`).
+function mapOff() {
+  const saved = store.get("mapOff");
+  return new Set(saved !== null ? saved.split(",").filter(Boolean) : MAP_KINDS.filter((k) => k.hidden).map((k) => k.id));
+}
+
+function showOnMap(i, kindId) {
+  mapState.layer = i.pos[0];
+  store.set("layer", i.pos[0]);
+  const off = mapOff();
+  if (off.has(kindId)) { off.delete(kindId); store.set("mapOff", [...off].join(",")); }
+  mapState.focus = { i, kindId };
+  go("map");
+}
+
+// Les compteurs sont ceux de toute la catégorie, comme dans la collection.
+function openMapFilters(ctx, shown) {
+  const T = t(), off = mapOff();
+  const rows = MAP_KINDS.filter((k) => shown.has(k.id)).map((kind) => {
+    const cat = state.catalog.categories.find((x) => x.id === kind.id), [n, total] = ctx.count(cat);
+    return el("label", { class: "row", style: "--inset:44px" },
+      el("span", { class: "dot", style: `background:${kind.color}` }),
+      el("span", { class: "body" }, el("span", { class: "title" }, cat.label[state.lang])),
+      el("span", { class: "trail" }, `${n}/${total}`),
+      el("span", { class: "switch" }, el("input", { type: "checkbox", checked: !off.has(kind.id), onchange: (e) => {
+        const now = mapOff();
+        e.target.checked ? now.delete(kind.id) : now.add(kind.id);
+        store.set("mapOff", [...now].join(","));
+        render();
+      } }), el("span")));
+  });
+  const hide = el("label", { class: "row" }, el("span", { class: "body" }, el("span", { class: "title" }, T.hideDone)),
+    el("span", { class: "switch" }, el("input", { type: "checkbox", checked: pref("hideDone", "0"), onchange: (e) => { store.set("hideDone", e.target.checked ? "1" : "0"); render(); } }), el("span")));
+  openSheet(sheetHead(T.mapFilters, T.layers[LAYER_IDS[mapState.layer]]), section(null, [hide]), section(null, rows, { foot: T.mapLegend }));
+}
+
+async function renderMap(ctx) {
+  const T = t(), { catalog } = state, { dlc, itemsOf, doneOf } = ctx;
+  if (!window.L) return window.addEventListener("load", render, { once: true });
+  try {
+    mapState.meta ??= await fetch("map/layers.json").then((r) => r.json());
+  } catch {
+    $("mapUi").replaceChildren(el("div", { class: "glass segmented" }, el("button", {}, T.mapError)));
+    return;
+  }
+  if (!dlc && mapState.layer === 2) mapState.layer = 0;
+
+  const hide = pref("hideDone", "0"), off = mapOff();
+  const onLayer = new Set(), points = [];
+  for (const kind of MAP_KINDS) {
+    const cat = catalog.categories.find((x) => x.id === kind.id), done = doneOf(cat);
+    for (const i of itemsOf(cat)) {
+      if (!i.pos || i.pos[0] !== mapState.layer) continue;
+      const ok = done.has(i.id);
+      onLayer.add(kind.id);
+      const focused = mapState.focus?.i === i;
+      if (!focused && (off.has(kind.id) || (hide && ok))) continue;
+      points.push({ i, kind, ok });
+    }
+  }
+
+  $("mapUi").replaceChildren(
+    el("div", { class: "segmented glass" }, ...LAYER_IDS.filter((id, n) => dlc || n !== 2).map((id) => {
+      const n = LAYER_IDS.indexOf(id);
+      return el("button", { type: "button", "aria-pressed": String(n === mapState.layer), onclick: () => { mapState.layer = n; store.set("layer", n); render(); } }, T.layers[id]);
+    })),
+    el("button", { class: "icon-btn glass", type: "button", "aria-label": T.mapFilters, onclick: () => openMapFilters(ctx, onLayer) }, icon("filter", 22, 2.2)));
+
+  if (!mapState.map) {
+    mapState.map = L.map("map", { crs: L.CRS.Simple, zoomSnap: 0.5, attributionControl: false, renderer: L.canvas({ tolerance: 10 }) });
+    mapState.markers = L.layerGroup().addTo(mapState.map);
+  }
+  const map = mapState.map, meta = mapState.meta[mapState.layer];
+  map.invalidateSize();
+  const at = (x, y) => map.unproject([x, y], meta.native);
+  if (mapState.shown !== mapState.layer) {
+    const bounds = L.latLngBounds(at(0, meta.h), at(meta.w, 0));
+    mapState.tiles?.remove();
+    mapState.tiles = L.tileLayer(`map/${meta.id}/{z}/{x}/{y}.webp`, { bounds, noWrap: true, maxNativeZoom: meta.native, maxZoom: meta.native + 1 }).addTo(map);
+    map.setMinZoom(0);
+    map.fitBounds(bounds);
+    map.setMinZoom(map.getZoom() - 0.5);
+    map.setMaxBounds(bounds.pad(0.15));
+    // Vue de départ : les grâces déjà activées sur cette carte, s'il y en a.
+    const lit = points.filter((p) => p.kind.id === "graces" && p.ok).map((p) => at(p.i.pos[1], p.i.pos[2]));
+    if (lit.length && !mapState.focus) map.fitBounds(L.latLngBounds(lit).pad(0.3), { maxZoom: meta.native - 2 });
+    mapState.shown = mapState.layer;
+  }
+
+  // À faire : plein et vif. Fait : creux et estompé. Position approximative : contour en
+  // pointillés, à peine rempli. Un appui ouvre la fiche de l'objet.
+  mapState.markers.clearLayers();
+  for (const { i, kind, ok } of points) {
+    const focused = mapState.focus?.i === i;
+    const style = {
+      radius: kind.radius + (focused ? 4 : 0), color: focused ? "#fff" : kind.color, weight: kind.ring || focused ? 2.5 : 1.5, opacity: ok && !focused ? 0.5 : 1,
+      fillColor: kind.color, fillOpacity: ok ? 0 : (kind.ring || i.near ? 0.35 : 0.95),
+      ...(i.near && !focused ? { dashArray: "3 3", weight: 2 } : {}),
+    };
+    L.circleMarker(at(i.pos[1], i.pos[2]), style).on("click", () => openItem(i, kind.id, ok, true)).addTo(mapState.markers);
+  }
+  if (mapState.focus) {
+    const { i } = mapState.focus;
+    map.setView(at(i.pos[1], i.pos[2]), meta.native - 1.5);
+    mapState.focus = null;
+  }
+}
+
+// --- Chargement ---------------------------------------------------------------------
+
+async function load() {
+  const bust = `?t=${Date.now()}`;
+  try {
+    const [catalog, progress] = await Promise.all(["catalog.json", "progress.json"].map((f) => fetch(f + bust).then((r) => {
+      if (!r.ok) throw new Error(`${f} : ${r.status}`);
+      return r.json();
+    })));
+    state.catalog = catalog;
+    state.progress = progress;
+    // Données de puissance des armes, facultatives : sans elles, les conseils d'armes
+    // se contentent des prérequis.
+    state.weapons ??= await fetch("weapons.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  } catch (e) {
+    $("top").replaceChildren(el("p", { class: "empty" }, t().loadError(e.message)));
+    return;
+  }
+  const saved = Number(store.get("char"));
+  state.char = state.progress.characters[saved] ? saved : 0;
+  render();
+}
+
+let lastRoute = location.hash;
+window.addEventListener("hashchange", () => {
+  const sameCat = route().cat && lastRoute === location.hash;
+  if (!sameCat) { $("search").value = ""; window.scrollTo(0, 0); }
+  lastRoute = location.hash;
+  closeSheet();
+  render();
+});
+$("search").oninput = () => {
+  const r = route(), cat = state.catalog?.categories.find((x) => x.id === r.cat);
+  if (!cat) return;
+  renderCategoryList(cat, tracker(state.progress.characters[state.char]));
+};
+window.addEventListener("scroll", () => $("navbar").classList.toggle("scrolled", window.scrollY > 40), { passive: true });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(); });
+renderTabbar(route().tab);
+$("top").replaceChildren(el("p", { class: "caption" }, t().loading));
+load();
+</script>
+</body>
+</html>
