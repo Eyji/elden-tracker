@@ -1,11 +1,11 @@
 {
-  "updated": 1794175587,
+  "updated": 1794175890,
   "characters": [
     {
       "slot": 0,
       "name": "Geralt",
       "level": 44,
-      "seconds": 130081,
+      "seconds": 130390,
       "class": 4,
       "stats": {
         "vig": 31,
@@ -112,7 +112,8 @@
           67280
         ],
         "crystaltears": [
-          65210
+          65210,
+          65240
         ],
         "flasks": [
           400191,
