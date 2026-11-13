@@ -1,11 +1,11 @@
 {
-  "updated": 1794592968,
+  "updated": 1794593271,
   "characters": [
     {
       "slot": 0,
       "name": "Geralt",
       "level": 47,
-      "seconds": 143667,
+      "seconds": 143917,
       "class": 4,
       "stats": {
         "vig": 31,
@@ -275,7 +275,8 @@
           4140,
           4010,
           4001,
-          4710
+          4710,
+          5100
         ],
         "spirits": [
           232000,
