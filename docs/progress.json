@@ -1,11 +1,11 @@
 {
-  "updated": 1794864667,
+  "updated": 1794864970,
   "characters": [
     {
       "slot": 0,
       "name": "Geralt",
       "level": 57,
-      "seconds": 178478,
+      "seconds": 178769,
       "class": 4,
       "stats": {
         "vig": 32,
@@ -84,7 +84,8 @@
           11500
         ],
         "bellbearings": [
-          11109745
+          11109745,
+          11109719
         ],
         "bosses": [
           18000800,
