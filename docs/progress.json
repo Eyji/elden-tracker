@@ -1,11 +1,11 @@
 {
-  "updated": 1794864364,
+  "updated": 1794864667,
   "characters": [
     {
       "slot": 0,
       "name": "Geralt",
       "level": 57,
-      "seconds": 178279,
+      "seconds": 178478,
       "class": 4,
       "stats": {
         "vig": 32,
@@ -276,6 +276,7 @@
           71223
         ],
         "incantations": [
+          6420,
           7500,
           6480,
           7220,
