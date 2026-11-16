@@ -1,11 +1,11 @@
 {
-  "updated": 1794861332,
+  "updated": 1794861636,
   "characters": [
     {
       "slot": 0,
       "name": "Geralt",
       "level": 55,
-      "seconds": 175366,
+      "seconds": 175549,
       "class": 4,
       "stats": {
         "vig": 32,
